@@ -106,6 +106,7 @@ async function importPricing(docBody, ofId, text) {
   const end = templateBody.getChildIndex(gt) + 1
   dlog(`Pricing Table ends at element %s`, end)
   let prevText = ``
+  let prevTable = {}
 
   for (let i = start; i < end; i++) {
     dlog(`Inspecting element %s`, i)
@@ -125,20 +126,23 @@ async function importPricing(docBody, ofId, text) {
         break;
       case DocumentApp.ElementType.TABLE:
         dlog(`Inserting Table`)
+        let insertTable = true
         e.setColumnWidth(0, (1.562 * 72))
         let header = e.getRow(0)
         let columns = header.getNumCells()
         e.setColumnWidth((columns - 1), (1 * 72))
         e.setAttributes(tbody)
-        if (!prevText.startsWith(`Year`)) {
-          dlog(`Table does not follow Header, deleting row 1.`)
-          e.removeRow(0)
-        } else {
+        if (prevText.startsWith(`Year`)) {
           dlog(`Table follows Header, styling row 1`)
           header.setAttributes(thead)
           for(let c = 0; c < columns; c++) {
-            header.getCell(c).setBackgroundColor(`#143d50`);
+            header.getCell(c).setBackgroundColor(`#143d50`)
           }
+          prevTable = e
+        } else {
+          dlog(`Table does not follow Header, deleting row 1.`)
+          e.removeRow(0)
+          insertTable = false
         }
         dlog(`Highlight Subtotals`)
         let rows = e.getNumRows()
@@ -157,9 +161,16 @@ async function importPricing(docBody, ofId, text) {
           } else {
             dlog(`Skipping row highlight`)
           }
+          if (!insertTable) {
+            dlog(`Appending row to previous table`)
+            prevTable.appendTableRow(row.copy())
+          }
         }
-        docBody.insertTable(j, e)
-        j++
+        if (insertTable) {
+          dlog(`Inserting new table`)
+          docBody.insertTable(j, e)
+          j++
+        }
         prevText = ``
         break;
       case DocumentApp.ElementType.LIST_ITEM:
